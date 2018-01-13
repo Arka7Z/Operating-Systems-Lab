@@ -3,6 +3,40 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+
+void create_proc(char *line , char **cmd_args)
+{
+  int status;
+  int a = fork();
+  if(a<0)
+    {
+      exit(1);
+    }
+  if(a==0)
+    {
+      //int i=0;
+      /*while(cmd_args[i])
+      {
+        printf("%s ",cmd_args[i]);
+	i++;
+      }
+      */
+      if(strcmp(cmd_args[0],"cd")==0)
+	{
+	  chdir(cmd_args[1]);
+	}
+      else if(execvp(*cmd_args,cmd_args) < 0)
+	exit(1);
+    }
+  else
+    {
+      
+      while (wait(&status) != a);
+      //wait(NULL);
+      //printf("child complete\n");
+    }
+}
+
 void parser(char *line , char **cmd_args)
 {
   char *token;
@@ -44,38 +78,5 @@ int main()
       else
 	exit(1);
       
-    }
-}
-
-void create_proc(char *line , char **cmd_args)
-{
-  int status;
-  int a = fork();
-  if(a<0)
-    {
-      exit(1);
-    }
-  if(a==0)
-    {
-      //int i=0;
-      /*while(cmd_args[i])
-      {
-        printf("%s ",cmd_args[i]);
-	i++;
-      }
-      */
-      if(strcmp(cmd_args[0],"cd")==0)
-	{
-	  chdir(cmd_args[1]);
-	}
-      else if(execvp(*cmd_args,cmd_args) < 0)
-	exit(1);
-    }
-  else
-    {
-      
-      while (wait(&status) != a);
-      //wait(NULL);
-      //printf("child complete\n");
     }
 }
