@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 
 void create_proc(char *line , char **cmd_args)
 {
