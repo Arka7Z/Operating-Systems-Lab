@@ -3,8 +3,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <bits/stdc++.h>
+#include <sys/wait.h>
 
-void create_proc(char *line , char **cmd_args)
+using namespace std;
+
+void create_proc(const char *line , char **cmd_args)
 {
   int status;
   int a = fork();
@@ -21,11 +25,8 @@ void create_proc(char *line , char **cmd_args)
 	i++;
       }
       */
-      if(strcmp(cmd_args[0],"cd")==0)
-	{
-	  chdir(cmd_args[1]);
-	}
-      else if(execvp(*cmd_args,cmd_args) < 0)
+      
+      if(execvp(*cmd_args,cmd_args) < 0)
 	exit(1);
     }
   else
@@ -37,12 +38,12 @@ void create_proc(char *line , char **cmd_args)
     }
 }
 
-void parser(char *line , char **cmd_args)
+void parser(const char *line , char **cmd_args)
 {
   char *token;
 
   token = (char *) malloc(100);
-  token = strtok(line," ");
+  token = strtok((char *) line," ");
 
   int i=0;
 
@@ -65,18 +66,28 @@ void parser(char *line , char **cmd_args)
 
 int main()
 {
-  char line[1000];
+  string line;
   char *cmd_args[64];
   while(1)
     {
-      printf("basher666-shell-> ");
-      scanf("%[^\n]%*c",line);
-      //printf("%s ",line);
-      parser(line,cmd_args);
+      printf("shellby-$ ");
+      //scanf("%[^\n]%*c",line);
+      getline(cin,line);
+      //printf("%s \n",line);
+      //printf("%d \n",strlen(line));
+      if(line.size()<2)
+	{
+	  //printf("chech\n");
+	  continue;
+	}
+      parser(line.c_str(),cmd_args);
+      if(strcmp(cmd_args[0],"cd")==0)
+	 chdir(cmd_args[1]);
       if(strcmp(cmd_args[0],"quit")!=0)
-	create_proc(line,cmd_args);
+	create_proc(line.c_str(),cmd_args);
       else
 	exit(1);
       
     }
 }
+
