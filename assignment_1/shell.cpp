@@ -73,6 +73,9 @@ int main()
       printf("shellby-$ ");
       //scanf("%[^\n]%*c",line);
       getline(cin,line);
+      if(cin.eof()==true)
+	break;
+      
       //printf("%s \n",line);
       //printf("%d \n",strlen(line));
       if(line.size()<2)
@@ -89,5 +92,6 @@ int main()
 	exit(1);
       
     }
+  return 0;
 }
 
