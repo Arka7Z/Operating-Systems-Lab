@@ -7,53 +7,38 @@
 #include <sys/wait.h>
 #include <fcntl.h>
 
-
+#define REMOVE_SPACES(x) x.erase(std::remove(x.begin(), x.end(), ' '), x.end())
 using namespace std;
 
 
-void create_proc_with_redirection(const char *line , char **cmd_args,string infile,bool in)
+void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=true,string filename="")
 {
   int status;
   int a = fork();
-  int file_desc=open(infile.c_str(),O_RDWR);
+  int file_desc;
+  if (directed)
+    file_desc=open(filename.c_str(),O_RDWR);
   if(a<0)
     {
       exit(1);
     }
   if(a==0)
     {
-      if(in)
+      if(directed)
       {
-          close(0);
-          dup(file_desc);
-      }
-      else
-      {
-        close(1);
-        dup(file_desc);
+          if(in)
+          {
+              close(0);
+              dup(file_desc);
+          }
+          else
+          {
+            close(1);
+            dup(file_desc);
+          }
       }
       if(execvp(*cmd_args,cmd_args) < 0)
-	    exit(1);
-    }
-  else
-    {
-        while (wait(&status) != a)
-        ;
-    }
-}
-
-void create_proc(const char *line , char **cmd_args)
-{
-  int status;
-  int a = fork();
-  if(a<0)
-    {
-      exit(1);
-    }
-  if(a==0)
-    {
-      if(execvp(*cmd_args,cmd_args) < 0)
-	    exit(1);
+	       exit(1);
     }
   else
     {
@@ -86,96 +71,45 @@ void parser(const char *line , char **cmd_args)
   cmd_args[i]='\0';
 }
 
-vector<string> split(const char *phrase, string delimiter)
-{
 
-    vector<string> list;
-    string s = string(phrase);
-    size_t pos = 0;
-    string token;
-    while ((pos = s.find(delimiter)) != string::npos) {
-        token = s.substr(0, pos);
-        list.push_back(token);
-        s.erase(0, pos + delimiter.length());
-    }
-    cout<<"before return "<<list[0]<<" "<<list[1]<<endl;
-    return list;
-}
-void redirect_Proc()
+
+void select_Proc(bool directed=false,bool in=true)
 {
   printf("shellby-$ ");
-  string line;
+  string line,file;
   getchar();
   char *cmd_args[64];
   getline(cin,line);
-  string s=line;
-
-  parser(line.c_str(),cmd_args);
-  string file = cmd_args[2];
-  cout <<file <<"-finelname "<<endl;
-  line = cmd_args[0];
-
-  parser(line.c_str(),cmd_args);
-
-  if(strcmp(cmd_args[0],"quit")!=0)
-     create_proc_with_redirection(line.c_str(),cmd_args,file,true);
-  else
-     exit(1);
-}
-
-void select_Proc()
-{
-    printf("shellby-$ ");
-  string line;
-  char *cmd_args[64];
-  getline(cin,line);
+  string line_tmp=line;
   if(cin.eof()==true)
-     return;
+     exit(1);
   if(line.size()<2)
    {
       return;
+   }
+   if (directed)
+   {
+     if(in)
+     {
+       line=line_tmp.substr(0,line_tmp.find("<"));
+       file=line_tmp.substr(line_tmp.find("<")+1,line_tmp.length());
+       REMOVE_SPACES(file);
+     }
+     else
+     {
+       line=line_tmp.substr(0,line_tmp.find(">"));
+       file=line_tmp.substr(line_tmp.find(">")+1,line_tmp.length());
+       REMOVE_SPACES(file);
+     }
    }
   parser(line.c_str(),cmd_args);
   if(strcmp(cmd_args[0],"cd")==0)
      chdir(cmd_args[1]);
   if(strcmp(cmd_args[0],"quit")!=0)
-     create_proc(line.c_str(),cmd_args);
+     create_proc(line.c_str(),cmd_args,directed,in,file);
   else
      exit(1);
 }
-void out_direct_proc()
-{
-  printf("shellby-$ ");
-  string line;
-  getchar();
-  char *cmd_args[64];
-  getline(cin,line);
-  string s=line;
-
-  parser(line.c_str(),cmd_args);
-  string file;
-
-  for(int i = 0; i < 64 ;i++)
-  {
-    if(strcmp(cmd_args[i],">")==0)
-    {
-      file = cmd_args[i+1];
-      break;
-    }
-    line+=cmd_args[i];
-  }
-
-  cout <<file <<"-finelname "<<endl;
-  //line = cmd_args[0];
-
-  parser(line.c_str(),cmd_args);
-
-  if(strcmp(cmd_args[0],"quit")!=0)
-     create_proc_with_redirection(line.c_str(),cmd_args,file,false);
-  else
-     exit(1);
-}
-
 
 int main()
 {
@@ -183,37 +117,22 @@ int main()
   while(1)
     {
       cin>>option;
-
-
-
       {
-        if(option== "A")
-                  select_Proc();
-                  //break;
-      if(option== "B")
-                  select_Proc();
-                  //break;
-        if(option== "C")
-
-                  redirect_Proc();
-
-      if(option== "D")
-                  out_direct_proc();
-                //  break;
-      if(option== "E");
-
-                //  break;
-        if(option== "F");
-
-                //  break;
-        if(option== "G");
-                  exit(1);
-                //  break;
+          if(option== "A")
+              select_Proc();
+          else if(option== "B")
+              select_Proc();
+          else  if(option== "C")
+              select_Proc(true,true);
+          else if(option== "D")
+              select_Proc(true,false);
+          else if(option== "E")
+                ;
+          else   if(option== "F")
+                ;
+          else   if(option== "G")
+                ;
       }
-
-
-
-
     }
   return 0;
 }
