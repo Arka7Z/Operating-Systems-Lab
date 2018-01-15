@@ -8,10 +8,11 @@
 #include <fcntl.h>
 
 #define REMOVE_SPACES(x) x.erase(std::remove(x.begin(), x.end(), ' '), x.end())
+
 using namespace std;
 
 
-void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=true,string filename="")
+void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=true,string filename="",bool background=false)
 {
   int status;
   int a = fork();
@@ -50,8 +51,10 @@ void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=
     }
   else
     {
+      if(!background)
         while (wait(&status) != a)
         ;
+
     }
 }
 
@@ -81,7 +84,7 @@ void parser(const char *line , char **cmd_args)
 
 
 
-void select_Proc(bool directed=false,bool in=true)
+void select_Proc(bool directed=false,bool in=true,bool background=false)
 {
   printf("shellby-$ ");
   string line,file;
@@ -114,7 +117,7 @@ void select_Proc(bool directed=false,bool in=true)
   if(strcmp(cmd_args[0],"cd")==0)
      chdir(cmd_args[1]);
   if(strcmp(cmd_args[0],"quit")!=0)
-     create_proc(line.c_str(),cmd_args,directed,in,file);
+     create_proc(line.c_str(),cmd_args,directed,in,file,background);
   else
      exit(1);
 }
@@ -124,6 +127,7 @@ int main()
   string option;
   while(1)
     {
+      cout<<"Option: ";
       cin>>option;
       {
           if(option== "A")
@@ -135,11 +139,11 @@ int main()
           else if(option== "D")
               select_Proc(true,false);
           else if(option== "E")
-                ;
+                select_Proc(false,true,true);
           else   if(option== "F")
                 ;
           else   if(option== "G")
-                ;
+                exit(1);
       }
     }
   return 0;
