@@ -17,7 +17,14 @@ void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=
   int a = fork();
   int file_desc;
   if (directed)
-    file_desc=open(filename.c_str(),O_RDWR);
+  {
+      if(!in)
+      {
+         file_desc=open(filename.c_str(),O_CREAT,S_IWGRP | S_IRUSR | S_IWUSR |S_IXUSR	);
+         close(file_desc);
+      }
+      file_desc=open(filename.c_str(),O_RDWR);
+  }
   if(a<0)
     {
       exit(1);
@@ -39,6 +46,7 @@ void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=
       }
       if(execvp(*cmd_args,cmd_args) < 0)
 	       exit(1);
+
     }
   else
     {
