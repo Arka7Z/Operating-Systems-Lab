@@ -27,11 +27,13 @@ vector<string> split(const string &s, char delim)
 }
 
 
-int spawn_proc (int in, int out, char **cmd)
+void spawn_proc (int in, int out, char **cmd_args)
 {
+  int status;
+  int a = fork();
   pid_t pid;
 
-  if ((pid = fork ()) == 0)
+  if (a == 0)
     {
       if (in != 0)
         {
@@ -45,14 +47,19 @@ int spawn_proc (int in, int out, char **cmd)
           close (out);
         }
 
-      return execvp (*cmd, cmd);
+        if(execvp(*cmd_args,cmd_args) < 0)
+  	       exit(1);
+    }
+    else
+    {
+      while (wait(&status) != a)
+      ;
     }
 
-  return pid;
+  //return pid;
 }
 
-
-int pipe_Command()
+void  pipe_Command()
 {
   printf("shellby-$ ");
   string line,file;
@@ -60,9 +67,7 @@ int pipe_Command()
   char *cmd_args[64];
   getline(cin,line);
   vector<string> commands=split(line,'|');
-  //list<char* cmd_args[64] > command_list(commands.size());
-  //  for(int i=0;i<commands.size();i++)
-  //   cout<<commands[i]<<endl;
+
 
   //////
   int n=commands.size();
@@ -91,13 +96,30 @@ int pipe_Command()
 
   /* Last stage of the pipeline - set stdin be the read end of the previous pipe
      and output to the original file descriptor 1. */
-  if (in != 0)
-    dup2 (in, 0);
+
 
   /* Execute the last stage with the current process. */
 
   parser(commands[i].c_str(),cmd_args);
-  return execvp (*cmd_args, cmd_args);
+  //return execvp (*cmd_args, cmd_args);
+
+  /////
+  int status;
+  int a = fork();
+
+  if (a == 0)
+    {
+      if (in != 0)
+        dup2 (in, 0);
+            if(execvp(*cmd_args,cmd_args) < 0)
+  	       exit(1);
+    }
+    else
+    {
+      while (wait(&status) != a)
+      ;
+    }
+
 
 }
 void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=true,string filename="",bool background=false)
@@ -229,7 +251,12 @@ int main()
           else if(option== "E")
                 select_Proc(false,true,true);
           else   if(option== "F")
-                pipe_Command();
+                {
+                  cout<<"IN again"<<endl;
+                  pipe_Command();
+                  cout<<"I am out"<<endl;
+                }
+
           else   if(option== "G")
                 exit(1);
       }
