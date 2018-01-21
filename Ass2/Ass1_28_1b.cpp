@@ -56,7 +56,6 @@ void spawn_proc (int in, int out, char **cmd_args)
       ;
     }
 
-  //return pid;
 }
 
 void  pipe_Command()
@@ -67,43 +66,27 @@ void  pipe_Command()
   char *cmd_args[64];
   getline(cin,line);
   vector<string> commands=split(line,'|');
-
-
-  //////
   int n=commands.size();
   int i;
   pid_t pid;
   int in, fd [2];
 
-  /* The first process should get its input from the original file descriptor 0.  */
   in = 0;
 
-  /* Note the loop bound, we spawn here all, but the last stage of the pipeline.  */
   for (i = 0; i < n - 1; ++i)
     {
       pipe (fd);
       char* cmd_args[64];
       parser(commands[i].c_str(),cmd_args);
-      /* f [1] is the write end of the pipe, we carry `in` from the prev iteration.  */
+
       spawn_proc (in, fd [1], cmd_args);
 
-      /* No need for the write end of the pipe, the child will write here.  */
       close (fd [1]);
 
-      /* Keep the read end of the pipe, the next child will read from there.  */
       in = fd [0];
     }
 
-  /* Last stage of the pipeline - set stdin be the read end of the previous pipe
-     and output to the original file descriptor 1. */
-
-
-  /* Execute the last stage with the current process. */
-
   parser(commands[i].c_str(),cmd_args);
-  //return execvp (*cmd_args, cmd_args);
-
-  /////
   int status;
   int a = fork();
 
@@ -146,13 +129,13 @@ void create_proc(const char *line , char **cmd_args,bool directed=false,bool in=
       {
           if(in)
           {
-              close(0);
-              dup(file_desc);
+              //close(0);
+              dup2(file_desc,0);
           }
           else
           {
-            close(1);
-            dup(file_desc);
+            //close(1);
+            dup2(file_desc,1);
           }
       }
       if(execvp(*cmd_args,cmd_args) < 0)
@@ -252,9 +235,7 @@ int main()
                 select_Proc(false,true,true);
           else   if(option== "F")
                 {
-                  cout<<"IN again"<<endl;
                   pipe_Command();
-                  cout<<"I am out"<<endl;
                 }
 
           else   if(option== "G")
