@@ -218,6 +218,14 @@ void select_Proc(bool directed=false,bool in=true,bool background=false)
 int main()
 {
   string option;
+  cout<<"MENU: "<<endl;
+  cout<<"A.      Run an internal command"<<endl;
+  cout<<"B.      Run an external command"<<endl;
+  cout<<"C.      Run an external command by redirecting standard input from a file"<<endl;
+  cout<<"D.      Run an external command by redirecting standard output to a file"<<endl;
+  cout<<"E.      Run an external command in the background"<<endl;
+  cout<<"F.      Run several external commands in the pipe mode"<<endl;
+  cout<<"G.      Quit the shell"<<endl;
   while(1)
     {
       cout<<"Option: ";
