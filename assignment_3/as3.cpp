@@ -2,25 +2,86 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <time.h>
+
+#define buf_size 5
 
 typedef struct
 {
-  int ar[5];
-  int id;
+  int ar[buf_size];
+  int cur_size;
 } SHM;
 
-#define shm_size sizeof(SHM)*4
+#define shm_size sizeof(SHM)
 
 using namespace std;
 
+
 int time_to_wait = 30;
-int num_consumer, num_producer;
+int num_consumer = 10, num_producer = 8;
 
+void consumer(int shm_id , key_t mem_key,int consumer_no)
+{
+  SHM* shm_ptr = (SHM *)shmat(shm_id , NULL, 0);
+  
+  int tmp,num;
+  sleep(rand()%6);
 
+  
+  while(true)
+    {
+      tmp=shm_ptr->cur_size;
+      if(tmp>0)
+	{
+	  shm_ptr->cur_size--;
+	  num=shm_ptr->ar[tmp-1];
+	  break;
+	}
+    }
+  time_t t;
+  time(&t);
 
+  
+  cout <<"consumer "<<consumer_no<<" number captured = "<<num<< " in process : "<< getpid() << ": time - "<< ctime(&t) <<endl;
+
+  shmdt(shm_ptr);
+  exit(0);
+}
+
+void producer(int shm_id , key_t mem_key, int producer_no)
+{
+  SHM* shm_ptr = (SHM *)shmat(shm_id , NULL, 0);
+
+  int gen = rand();
+
+  sleep(rand()%6);
+
+  int tmp;
+  
+  while(true)
+    {
+      tmp=shm_ptr->cur_size;
+      if(tmp<5)
+	{
+	  shm_ptr->cur_size++;
+	  shm_ptr->ar[tmp]=gen;
+	  break;
+	}
+    }
+
+  time_t t;
+  time(&t);
+
+  cout <<"Producer "<<producer_no<<" number produced = "<<gen<< " in process : "<< getpid() << ": time - "<< ctime(&t) <<endl;
+
+  shmdt(shm_ptr);
+  exit(0);
+}
 int main()
 {
-  int shm_id;
+  vector<int > pids;
+  int shm_id,id;
   key_t mem_key;
   int *shm_ptr;
   mem_key = ftok(".",'a');
@@ -31,5 +92,44 @@ int main()
       perror("shmget failed");
       exit(-1);
     }
- }
+
+  for(int i=0;i<num_producer;i++)
+    {
+      id = fork();
+      if(id==0)
+	{
+	  srand(i);
+	  producer(shm_id, mem_key,i+1);
+	}
+      else
+	{
+	  pids.push_back(id);
+	}
+    }
+
+  for(int i=0;i<num_consumer;i++)
+    {
+      id=fork();
+      if(id==0)
+	{
+	  srand(i+num_consumer);
+	  consumer(shm_id,mem_key,i+1);
+	}
+      else
+	{
+	  pids.push_back(id);
+	}
+    }
+
+  sleep(30);
+
+  for(int i=0;i<pids.size();i++)
+    {
+      kill(pids[i],SIGKILL);
+    }
+
+  shmctl(shm_id,IPC_RMID,NULL);
+
+  return 1;
+}
  
