@@ -5,8 +5,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
-
-#define bufsize 30000
+#define bufsize 1000
 
 using namespace std;
 
@@ -25,7 +24,7 @@ void sigusr2_handler(int signum)
   
   //cout<<"back to work - "<<pthread_self()<<endl;
   // signal(SIGUSR1,sigusr1_handler);
-  // signal(SIGUSR2,sigusr2_handler);
+  //signal(SIGUSR2,sigusr2_handler);
   cout<<"returning from sigusr2_handler()"<<endl;
 }
 
@@ -34,7 +33,7 @@ void sigusr1_handler(int signum)
   if(signum==SIGUSR1)
     {
       //cout<<"sigusr1 handled"<<endl;
-      // signal(SIGUSR1,sigusr1_handler);
+      //signal(SIGUSR1,sigusr1_handler);
       // signal(SIGUSR2,sigusr2_handler);
       //cout<<"thread - "<<pthread_self()<<" pausing"<<endl;
       pause();
@@ -52,6 +51,7 @@ void sigint_handler(int signum)
 
 void* worker_func(void * tmp)
 {
+  pause();
   //signal(SIGUSR1,sigusr1_handler);
   //signal(SIGUSR2,sigusr2_handler);
   
@@ -65,7 +65,7 @@ void* worker_func(void * tmp)
   for(int i=0;i<bufsize;i++)
     {
       //ar[i]= i > 0 ? (ar[i-1] * 23) % 10007 : *w_id;
-      ar[i]=(rand()%10007+1);
+      //ar[i]=(rand()%10007+1);
     }
   //printf("generated in worker in %d\n",*w_id);
   fflush(stdout);
@@ -94,10 +94,17 @@ void* worker_func(void * tmp)
       
     }
   
-  //printf("sorted in worker in %d\n",*w_id);
+  printf("sorted in worker in %d\n",*w_id);
   fflush(stdout);
-  sleep(rand()%11+1);
-  //printf("worker_func() %d completed\n",*w_id);
+  
+  int t = rand()%11+1;
+  t = t*1000000;
+  while(t>1001)
+    {
+      printf("worker %d sleeping for %d seconds\n",*w_id,t);
+      t=usleep(t);
+    }
+  printf("worker_func() %d completed\n",*w_id);
   status[*w_id]=2;
 
   pthread_exit(0);
@@ -119,7 +126,7 @@ void* scheduler_func(void * args)
       ready.push(i);
     }
   
-  while(not ready.empty())
+  while(!ready.empty())
     {
       int w_id = ready.front();
       pthread_kill(workers[w_id],SIGUSR2);
@@ -131,12 +138,12 @@ void* scheduler_func(void * args)
 	{
 	  
 	  //pthread_kill(workers[w_id],SIGKILL);
-	  //printf("finished thread %d \n",w_id);
+	  printf("finished thread %d \n",w_id);
 	  pthread_cancel(workers[w_id]);
  	  ready.pop();
 	  running_n--;
-	  //cout<<"finished removing thread from queue"<<endl;
-	  //printf("ready size = %d\n",ready.size());
+	  cout<<"finished removing thread from queue"<<endl;
+	  printf("ready size = %d\n",ready.size());
 	  //printf("running = %d\n",running_n);
 	  if(running_n==0 || ready.empty())
 	    break;
@@ -147,7 +154,7 @@ void* scheduler_func(void * args)
 	  pthread_kill(workers[w_id],SIGUSR1);
 
 	  status[w_id]=0;
-	  //printf("worker %d is pausing\n",w_id);
+	  printf("worker %d is pausing\n",w_id);
 	  //printf("ready size = %d\n",ready.size());
 	  
 	  int t = ready.front();
@@ -179,10 +186,13 @@ void* reporter_func(void *nn)
 	  if(status[i]==1)
 	    {
 	      //printf("found a running thread\n");
-	      if(prev_running<0 || prev_running!=i) 
+	      if(prev_running!=i) 
 		{
-		  printf("worker - %d has paused\n",prev_running);
-		  printf("worker - %d is running\n",i);
+		  if(prev_running>=0)
+		    {
+		      printf("worker - %d has paused\n",prev_running);
+		      printf("worker - %d is running\n",i);
+		    }
 		  prev_running=i;
 		}
 	    }
@@ -191,7 +201,7 @@ void* reporter_func(void *nn)
 	      if(ack[i]==0)
 		{
 		  ack[i]=1;
-		  printf("worker - %d has stopped\n",i);
+		  printf("worker - %d has terminated\n",i);
 		}
 	      terminated++;
 	    }
@@ -232,7 +242,7 @@ int main()
   util.n = n;
   pthread_create(&sched_t,attr,scheduler_func,(void *)&util);
 
-  cout<<"check1 in main()"<<endl;
+  //cout<<"check1 in main()"<<endl;
   pthread_create(&report_t,attr,reporter_func,(void *)&n);
   void ** ret;
   pthread_join(sched_t, NULL);
