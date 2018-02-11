@@ -16,6 +16,10 @@ typedef struct
   int n;
 } sched_args;
 
+
+
+
+
 void sigusr1_handler(int);
 void sigusr2_handler(int);
 
@@ -51,9 +55,11 @@ void sigint_handler(int signum)
 
 void* worker_func(void * tmp)
 {
-  pause();
   //signal(SIGUSR1,sigusr1_handler);
   //signal(SIGUSR2,sigusr2_handler);
+
+  pause();
+  
   
   int * w_id = (int *)tmp;
   //usleep(100);
@@ -65,7 +71,7 @@ void* worker_func(void * tmp)
   for(int i=0;i<bufsize;i++)
     {
       //ar[i]= i > 0 ? (ar[i-1] * 23) % 10007 : *w_id;
-      //ar[i]=(rand()%10007+1);
+      ar[i]=(rand()%10007+1);
     }
   //printf("generated in worker in %d\n",*w_id);
   fflush(stdout);
@@ -98,11 +104,10 @@ void* worker_func(void * tmp)
   fflush(stdout);
   
   int t = rand()%11+1;
-  t = t*1000000;
-  while(t>1001)
+  while(t>1)
     {
       printf("worker %d sleeping for %d seconds\n",*w_id,t);
-      t=usleep(t);
+      t=sleep(t);
     }
   printf("worker_func() %d completed\n",*w_id);
   status[*w_id]=2;
@@ -125,17 +130,35 @@ void* scheduler_func(void * args)
     {
       ready.push(i);
     }
-  
+  struct timespec ts;  
+  int s;
   while(!ready.empty())
     {
       int w_id = ready.front();
       pthread_kill(workers[w_id],SIGUSR2);
       //printf("running worker %d\n",w_id);
       status[w_id]=1;
+
+
+      //if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
+      //{
+      //  printf("clock_gettime() error");
+	  /* Handle error */
+      //}
+
+      //ts.tv_sec += 1;
+
+      //s = pthread_timedjoin_np(workers[w_id], NULL, &ts);
+      //if (s != 0)
+      //{
+	/* Handle error */
+	//}
+      
       sleep(1);
       
       if(status[w_id]==2)
 	{
+	  
 	  
 	  //pthread_kill(workers[w_id],SIGKILL);
 	  printf("finished thread %d \n",w_id);
@@ -145,7 +168,7 @@ void* scheduler_func(void * args)
 	  cout<<"finished removing thread from queue"<<endl;
 	  printf("ready size = %d\n",ready.size());
 	  //printf("running = %d\n",running_n);
-	  if(running_n==0 || ready.empty())
+	  if(running_n == 0 || ready.empty())
 	    break;
 	}
       else if(status[w_id]==1)
