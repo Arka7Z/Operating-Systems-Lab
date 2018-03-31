@@ -27,6 +27,7 @@ void init(list<int>& free_frames)
   std::iota(free_frames.begin(),free_frames.end(),0);
   for(int i=0;i<64;i++)
     pageTable[i].reset();
+  page_fifo.clear();
 }
 
 vector<string> split(const string &s, char delim)
@@ -64,6 +65,23 @@ bool is_dirty(int virtual_page)
   else
     return true;
 }
+bool is_referenced(int virtual_page)
+{
+  if(pageTable[virtual_page][31]==0)
+    return false;
+  else
+    return true;
+}
+
+void set_valid(int  virtual_page)
+{
+  pageTable[virtual_page][29]=1;
+}
+
+void set_invalid(int  virtual_page)
+{
+  pageTable[virtual_page][29]=0;
+}
 
 void set_referenced_bit(int  virtual_page)
 {
@@ -85,6 +103,7 @@ void map_table(int virtual_page,int frame)
   bitset<29> tmp(frame);
   for(int i=0;i<29;i++)
     pageTable[virtual_page][i]=tmp[i];
+  pageTable[virtual_page][29]=1;
 }
 int get_frame(int virtual_page)
 {
@@ -93,6 +112,21 @@ int get_frame(int virtual_page)
     tmp[i]=pageTable[virtual_page][i];
   int frame = (int)(tmp.to_ulong());
   return frame;
+}
+
+void clear_referenced_bit()
+{
+  for(int i=0;i<virtual_AS;i++)
+  {
+    pageTable[i][31]=0;
+  }
+}
+
+void clear_referenced_bit(int virtual_page)
+{
+
+    pageTable[virtual_page][31]=0;
+
 }
 
 void handle_instruction_fifo(int instr_num,int rw, int virtual_page, list<int>& free_frames)
@@ -138,6 +172,7 @@ void handle_instruction_fifo(int instr_num,int rw, int virtual_page, list<int>& 
     }
     else
     {
+
         int victim_page=page_fifo.front();               // SELECT VICTIM PAGE
         page_fifo.pop_front();
 
@@ -145,6 +180,104 @@ void handle_instruction_fifo(int instr_num,int rw, int virtual_page, list<int>& 
 
         // UNMAP
         cout<<instr_num<<": "<<"UNMAP"<<" "<<victim_page<<" "<<victim_frame<<endl;
+        set_invalid(victim_page);
+        total_cost+=unmap_cost;
+
+        if(is_dirty(victim_page))
+        {
+          // write to memory
+          reset_dirty_bit(virtual_page);
+          cout<<instr_num<<": "<<"OUT"<<" "<<victim_page<<" "<<victim_frame<<endl;
+          total_cost+=page_out_cost;
+          page_trans++;
+        }
+
+        // load page virtual_page into frame
+        cout<<instr_num<<": "<<"IN"<<" "<<virtual_page<<" "<<victim_frame<<endl;
+        total_cost+=page_in_cost;
+        page_trans++;
+
+        // map virtual_page to frame
+        total_cost+=map_cost;
+        cout<<instr_num<<": "<<"MAP"<<" "<<virtual_page<<" "<<victim_frame<<endl;
+        page_fifo.push_back(virtual_page);
+        map_table(virtual_page,victim_frame);
+
+        // read write
+        total_cost+=mem_acc_cost;
+        set_referenced_bit(virtual_page);
+        if(rw)
+          set_dirty_bit(virtual_page);
+
+    }
+
+  }
+  cout<<endl;
+}
+
+void handle_instruction_second_chance(int instr_num,int rw, int virtual_page, list<int>& free_frames)
+{
+
+  unordered_set<int> frame_in_memory;
+
+  if(is_valid(virtual_page))
+  {
+    // Valid
+    set_referenced_bit(virtual_page);
+    if(rw)
+      set_dirty_bit(virtual_page);
+    total_cost+=mem_acc_cost;
+  }
+  else
+  {
+    // Page Fault
+    page_fault++;
+    if(free_frames.size()>0)
+    {
+      // Memory not full
+      int frame=free_frames.front();
+      free_frames.pop_front();
+
+      // load page virtual_page into frame
+      cout<<instr_num<<": "<<"IN"<<" "<<virtual_page<<" "<<frame<<endl;
+      total_cost+=page_in_cost;
+      page_trans++;
+      page_fifo.push_back(virtual_page);
+
+      // map virtual_page to frame
+      total_cost+=map_cost;
+      map_table(virtual_page,frame);
+      cout<<instr_num<<": "<<"MAP"<<" "<<virtual_page<<" "<<frame<<endl;
+
+      // read write
+      set_referenced_bit(virtual_page);
+      if(rw)
+        set_dirty_bit(virtual_page);
+      total_cost+=mem_acc_cost;
+
+    }
+    else
+    {
+
+        int victim_page;
+        while(1)
+        {
+          victim_page=page_fifo.front();               // SELECT VICTIM PAGE
+          page_fifo.pop_front();
+          if(is_referenced(victim_page))
+          {
+            clear_referenced_bit(victim_page);
+            page_fifo.push_back(victim_page);
+          }
+          else
+            break;
+        }
+
+        int victim_frame=get_frame(victim_page);
+
+        // UNMAP
+        cout<<instr_num<<": "<<"UNMAP"<<" "<<victim_page<<" "<<victim_frame<<endl;
+        set_invalid(victim_page);
         total_cost+=unmap_cost;
 
         if(is_dirty(victim_page))
@@ -229,6 +362,7 @@ void handle_instruction_random(int instr_num,int rw, int virtual_page, list<int>
         // UNMAP
         total_cost+=unmap_cost;
         cout<<instr_num<<": "<<"UNMAP"<<" "<<victim_page<<" "<<victim_frame<<endl;
+        set_invalid(victim_page);
         if(is_dirty(victim_page))
         {
           // write to memory
@@ -271,6 +405,101 @@ void handle_instruction_LRU(int instr_num,int rw, int virtual_page, list<int>& f
   if(is_valid(virtual_page))
   {
     // Valid
+
+    set_referenced_bit(virtual_page);
+    if(rw)
+      set_dirty_bit(virtual_page);
+    total_cost+=mem_acc_cost;
+  }
+  else
+  {
+    // Page Fault
+
+    page_fault++;
+    if(free_frames.size()>0)
+    {
+      // Memory not full
+      int frame=free_frames.front();
+      free_frames.pop_front();
+
+      // load page virtual_page into frame
+      cout<<instr_num<<": "<<"IN"<<" "<<virtual_page<<" "<<frame<<endl;
+      total_cost+=page_in_cost;
+      page_trans++;
+      page_fifo.push_back(virtual_page);
+
+
+      // map virtual_page to frame
+      map_table(virtual_page,frame);
+
+      cout<<instr_num<<": "<<"MAP"<<" "<<virtual_page<<" "<<frame<<endl;
+      total_cost+=map_cost;
+
+      // read write
+      set_referenced_bit(virtual_page);
+      if(rw)
+        set_dirty_bit(virtual_page);
+      total_cost+=mem_acc_cost;
+    }
+    else
+    {
+
+        int lru=INT_MAX,victim_page;
+        for(int i=0;i<virtual_AS;i++)
+          if(page_use[i]<lru)
+          {
+            lru=page_use[i];
+            victim_page=i;
+          }
+
+        int victim_frame=get_frame(victim_page);
+        // UNMAP
+        total_cost+=unmap_cost;
+        cout<<instr_num<<": "<<"UNMAP"<<" "<<victim_page<<" "<<victim_frame<<endl;
+        set_invalid(victim_page);
+        page_use[victim_page]=INT_MAX;
+        if(is_dirty(victim_page))
+        {
+          // write to memory
+          reset_dirty_bit(virtual_page);
+          cout<<instr_num<<": "<<"OUT"<<" "<<victim_page<<" "<<victim_frame<<endl;
+          total_cost+=page_out_cost;
+          page_trans++;
+        }
+
+        // load page virtual_page into frame
+        cout<<instr_num<<": "<<"IN"<<" "<<virtual_page<<" "<<victim_frame<<endl;
+        total_cost+=page_in_cost;
+        page_trans++;
+
+        // map virtual_page to frame
+        total_cost+=map_cost;
+        cout<<instr_num<<": "<<"MAP"<<" "<<virtual_page<<" "<<victim_frame<<endl;
+
+        map_table(virtual_page,victim_frame);
+
+
+        // read write
+        set_referenced_bit(virtual_page);
+        if(rw)
+          set_dirty_bit(virtual_page);
+        total_cost+=mem_acc_cost;
+
+    }
+
+  }
+  cout<<endl;
+}
+void handle_instruction_NRU(int instr_num,int rw, int virtual_page, list<int>& free_frames)
+{
+
+
+  vector<int> class_0,class_1,class_2,class_3;
+
+  if(is_valid(virtual_page))
+  {
+    // Valid
+    cout<<"SHOWING VALID "<<virtual_page<<endl;
     set_referenced_bit(virtual_page);
     if(rw)
       set_dirty_bit(virtual_page);
@@ -309,19 +538,37 @@ void handle_instruction_LRU(int instr_num,int rw, int virtual_page, list<int>& f
     {
 
 
-        int lru=INT_MAX,victim_page;
-        for(int i=0;i<virtual_AS;i++)
-          if(page_use[i]<lru)
+        int victim_page;
+        for(int page=0;page<virtual_AS;page++)
           {
-            lru=page_use[i];
-            victim_page=i;
+            if(is_valid(page))                  // if page in memory
+            {
+              if (is_dirty(page)&& is_referenced(page) )
+                class_3.push_back(page);
+              else if(!is_dirty(page) && is_referenced(page))
+                class_2.push_back(page);
+              else if (is_dirty(page) && !is_referenced(page))
+                class_1.push_back(page);
+              else
+                class_0.push_back(page);
+            }
           }
+
+        if(class_0.size()>0)
+          victim_page=class_0[rand()%class_0.size()];
+        else if (class_1.size()>0)
+          victim_page=class_1[rand()%class_1.size()];
+        else if (class_2.size()>0)
+          victim_page=class_2[rand()%class_2.size()];
+        else if (class_3.size()>0)
+          victim_page=class_3[rand()%class_3.size()];
 
         int victim_frame=get_frame(victim_page);
         // UNMAP
         total_cost+=unmap_cost;
         cout<<instr_num<<": "<<"UNMAP"<<" "<<victim_page<<" "<<victim_frame<<endl;
-        page_use[victim_page]=INT_MAX;
+        set_invalid(victim_page);
+
         if(is_dirty(victim_page))
         {
           // write to memory
@@ -352,9 +599,14 @@ void handle_instruction_LRU(int instr_num,int rw, int virtual_page, list<int>& f
     }
 
   }
+
+  if(page_fault%10==0 && instr_num!=1)
+  {
+    // clear reference bits for all
+    clear_referenced_bit();
+  }
   cout<<endl;
 }
-
 int main()
 {
   cout<<"Enter number of frames in memory"<<endl;
@@ -407,6 +659,7 @@ int main()
   instr_num=1;
   for (std::string line; std::getline(file_LRU, line); )
   {
+    cout<<endl<<"Line is "<<line<<" Instr count: "<<instr_num<<endl;
     if(line[0]=='#')
       continue;
     std::vector<string> line_vec=split(line,' ');
@@ -417,5 +670,39 @@ int main()
   }
   cout<<"Page faults: "<<page_fault<<". Page transfers: "<<page_trans<<". Total cost: "<<total_cost<<endl<<"-----------------------------------"<<endl;
   file_LRU.close();
+
+  init(free_frames);
+  cout<<"Page Replacement Algorithm: NRU"<<endl;
+  ifstream file_NRU("test.txt");
+  instr_num=1;
+  for (std::string line; std::getline(file_NRU, line); )
+  {
+    if(line[0]=='#')
+      continue;
+    std::vector<string> line_vec=split(line,' ');
+    int rw=stoi(line_vec[0]);
+    int virtual_page=stoi(line_vec[1]);
+    handle_instruction_NRU(instr_num,rw,virtual_page,free_frames);
+    instr_num++;
+  }
+  cout<<"Page faults: "<<page_fault<<". Page transfers: "<<page_trans<<". Total cost: "<<total_cost<<endl<<"-----------------------------------"<<endl;
+  file_NRU.close();
+
+  init(free_frames);
+  cout<<"Page Replacement Algorithm: Second Chance"<<endl;
+  ifstream file_SC("test.txt");
+  instr_num=1;
+  for (std::string line; std::getline(file_SC, line); )
+  {
+    if(line[0]=='#')
+      continue;
+    std::vector<string> line_vec=split(line,' ');
+    int rw=stoi(line_vec[0]);
+    int virtual_page=stoi(line_vec[1]);
+    handle_instruction_second_chance(instr_num,rw,virtual_page,free_frames);
+    instr_num++;
+  }
+  cout<<"Page faults: "<<page_fault<<". Page transfers: "<<page_trans<<". Total cost: "<<total_cost<<endl<<"-----------------------------------"<<endl;
+  file_SC.close();
 
 }
